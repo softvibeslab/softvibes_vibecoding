@@ -1,0 +1,110 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  Vibecoding Ecosystem - Docker Compose                                        ║
+# ║  Orquestación de servicios para desarrollo completo                          ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+services:
+  vibecoding:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vibecoding-main
+    hostname: vibecoding
+    stdin_open: true
+    tty: true
+    environment:
+      # Z.AI / GLM-4.7
+      - ZAI_API_KEY=${ZAI_API_KEY}
+      - ZAI_BASE_URL=${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4/}
+      - ZAI_MODEL=${ZAI_MODEL:-glm-4.7}
+
+      # Claude Code
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Pica
+      - PICA_SECRET_KEY=${PICA_SECRET_KEY}
+
+      # Telegram (opcional)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+
+      # Configuración
+      - NODE_ENV=development
+      - LOG_LEVEL=info
+      - DEV_PORT=3000
+
+    volumes:
+      # Montar directorio de proyectos
+      - ./projects:/home/vibecoder/projects
+
+      # Persistir configuraciones
+      - vibecode-claude:/home/vibecoder/.claude
+      - vibecode-openclaw:/home/vibecoder/.openclaw
+      - vibecode-moai:/home/vibecoder/.moai
+      - vibecode-data:/home/vibecoder/.vibecoding
+
+      # Logs
+      - vibecode-logs:/var/log/vibecoding
+
+    ports:
+      - "3000:3000"   # Desarrollo
+      - "8000:8000"   # Python backend
+      - "8080:8080"   # Alternativo
+
+    networks:
+      - vibecoding-net
+
+    restart: unless-stopped
+
+  # Servicio opcional: Base de datos para proyectos
+  postgres:
+    image: postgres:16-alpine
+    container_name: vibecoding-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-vibecoding}
+      - POSTGRES_USER=${POSTGRES_USER:-vibecoder}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vibecoding123}
+    volumes:
+      - vibecode-db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - vibecoding-net
+    restart: unless-stopped
+    profiles:
+      - with-db
+
+  # Servicio opcional: Redis para caché
+  redis:
+    image: redis:7-alpine
+    container_name: vibecoding-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - vibecode-redis:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - vibecoding-net
+    restart: unless-stopped
+    profiles:
+      - with-redis
+
+volumes:
+  vibecode-claude:
+    driver: local
+  vibecode-openclaw:
+    driver: local
+  vibecode-moai:
+    driver: local
+  vibecode-data:
+    driver: local
+  vibecode-logs:
+    driver: local
+  vibecode-db:
+    driver: local
+  vibecode-redis:
+    driver: local
+
+networks:
+  vibecoding-net:
+    driver: bridge
